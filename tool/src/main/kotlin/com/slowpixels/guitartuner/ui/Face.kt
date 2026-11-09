@@ -14,6 +14,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -59,6 +60,13 @@ private class Place(val w: Float, val h: Float) {
     val spacing = w * 0.135f
     private val spacingTop = w * 0.115f
 
+    // The electric's row of lights, as on a tuning pedal.
+    val ledY = h * 0.19f
+    val ledGap = 33f * s
+    val ledR = 11f * s
+    val ledTargetR = 15f * s
+    fun ledX(i: Int) = cx + i * ledGap + (if (i < 0) -12f * s else if (i > 0) 12f * s else 0f)
+
     fun stringX(i: Int) = cx + (i - 2.5f) * spacing
     fun stringTopX(i: Int) = cx + (i - 2.5f) * spacingTop
 
@@ -72,6 +80,9 @@ private class Place(val w: Float, val h: Float) {
         /** The furthest the needle swings, and where it lies with nothing playing. */
         const val SWING = 50f
         const val REST = -55f
+
+        /** Lights either side of the middle one. */
+        const val LEDS = 5
 
         /**
          * The needle's angle for a reading, in degrees from upright. Like a VU meter's, the scale is stretched where it
@@ -90,8 +101,19 @@ private class Place(val w: Float, val h: Float) {
 private fun rad(deg: Float) = deg * PI.toFloat() / 180f
 
 /**
+ * Which of the electric's lights a reading lights, -5..5 with 0 the middle: the same stretched scale as the needle,
+ * so the last few cents still move it.
+ */
+internal fun ledFor(cents: Double): Int {
+    val share = (abs(cents) / 50.0).coerceAtMost(1.0).pow(0.62)
+    val n = kotlin.math.ceil(share * Place.LEDS - 0.35).toInt().coerceIn(1, Place.LEDS)
+    return if (cents < 0) -n else n
+}
+
+/**
  * The tuner's face, in Light's line-and-type look: a bare meter, and the six strings below it over the soundhole
- * (acoustic) or the pickups (electric). A string starts slack, in a lazy wave: nothing has been heard from it, so
+ * (acoustic) or the pickups (electric). The acoustic's meter is a needle on an arc; the electric's is a row of lights,
+ * as on a tuning pedal. A string starts slack, in a lazy wave: nothing has been heard from it, so
  * nothing's claimed for it. It tightens as it nears its note and is pulled straight when it gets there, and it stays
  * straight, so a guitar in tune is six clean lines.
  */
@@ -163,8 +185,13 @@ fun TunerFace(
         val p = Place(size.width, size.height)
         if (electric) pickups(p, faint) else soundhole(p, faint)
         strings(p, tuning, dial, held, flip, ink, paper, measurer, family)
-        scale(p, ink, faint, measurer, family)
-        meter(p, dial, heard, lit, word, plain, a4, ink, faint, measurer, family)
+        if (electric) {
+            lights(p, dial, lit, ink, faint, measurer, family)
+        } else {
+            scale(p, ink, faint, measurer, family)
+            needle(p, dial, lit, ink)
+        }
+        meter(p, heard, lit, word, plain, a4, ink, faint, measurer, family)
     }
 }
 
@@ -233,10 +260,8 @@ private fun DrawScope.scale(p: Place, ink: Color, faint: Color, m: TextMeasurer,
 
 // ---- the moving parts ----
 
-private fun DrawScope.meter(
-    p: Place, dial: Dial, heard: Note?, lit: Boolean, word: String, plain: String, a4: Int,
-    ink: Color, faint: Color, m: TextMeasurer, family: FontFamily,
-) {
+/** The acoustic's needle on its arc, and the lamp over the target. */
+private fun DrawScope.needle(p: Place, dial: Dial, lit: Boolean, ink: Color) {
     val rest = dial.cents.isNaN()
     val angle = when {
         rest -> Place.REST
@@ -253,7 +278,49 @@ private fun DrawScope.meter(
     val lr = 7f * p.s
     if (lit) drawCircle(ink, lr + 1f * p.s, Offset(p.cx, p.lampY))
     else drawCircle(ink, lr, Offset(p.cx, p.lampY), style = Stroke(1.6f * p.s))
+}
 
+/**
+ * The electric's meter, as on a tuning pedal: eleven lights with a bigger one in a window in the middle. One lights
+ * where the string is; dead on, the middle one and its neighbours light.
+ */
+private fun DrawScope.lights(p: Place, dial: Dial, lit: Boolean, ink: Color, faint: Color, m: TextMeasurer, family: FontFamily) {
+    val y = p.ledY
+    val on = if (dial.cents.isNaN() || lit) 0 else ledFor(dial.cents)
+    for (i in -Place.LEDS..Place.LEDS) {
+        if (i == 0) continue
+        val c = Offset(p.ledX(i), y)
+        if (i == on || (lit && abs(i) == 1)) drawCircle(ink, p.ledR + 1f * p.s, c)
+        else drawCircle(ink, p.ledR, c, style = Stroke(1.6f * p.s))
+    }
+    // The target: a bigger light in a square window.
+    val win = 23f * p.s
+    drawRoundRect(ink, Offset(p.cx - win, y - win), Size(2 * win, 2 * win), CornerRadius(7f * p.s), style = Stroke(1.6f * p.s))
+    if (lit) drawCircle(ink, p.ledTargetR, Offset(p.cx, y))
+    else drawCircle(ink, p.ledTargetR, Offset(p.cx, y), style = Stroke(1.8f * p.s))
+    // Printed under the row: flat, the arrows pointing in, sharp.
+    val legend = y + 52f * p.s
+    val sign = style(family, p.h * 0.042f, faint)
+    centred(m, "♭", p.ledX(-Place.LEDS), legend, sign)
+    centred(m, "♯", p.ledX(Place.LEDS), legend, sign)
+    for (side in intArrayOf(-1, 1)) {
+        val tip = p.cx + side * 34f * p.s
+        val back = p.cx + side * 54f * p.s
+        val arrow = Path().apply { moveTo(tip, legend); lineTo(back, legend - 9f * p.s); lineTo(back, legend + 9f * p.s); close() }
+        drawPath(arrow, faint)
+    }
+    // A row of fine dots along the bottom of the window, as on a pedal's face.
+    val dots = PathEffect.dashPathEffect(floatArrayOf(2f * p.s, 4f * p.s))
+    val dy = y + 31f * p.s
+    drawLine(faint, Offset(p.ledX(-Place.LEDS) - 14f * p.s, dy), Offset(p.cx - 29f * p.s, dy), 1.5f * p.s, pathEffect = dots)
+    drawLine(faint, Offset(p.cx + 29f * p.s, dy), Offset(p.ledX(Place.LEDS) + 14f * p.s, dy), 1.5f * p.s, pathEffect = dots)
+}
+
+/** The note, the words, and the reference pitch: the same over either meter. */
+private fun DrawScope.meter(
+    p: Place, heard: Note?, lit: Boolean, word: String, plain: String, a4: Int,
+    ink: Color, faint: Color, m: TextMeasurer, family: FontFamily,
+) {
     if (a4 != 440) rightAt(m, "A = $a4", p.w - p.margin, p.lampY, style(family, p.h * 0.026f, faint))
 
     val y = p.noteY
@@ -266,7 +333,7 @@ private fun DrawScope.meter(
     }
     if (word.isNotEmpty()) {
         val loud = style(family, p.h * 0.03f, ink, spacing = 0.12f)
-        if (dial.cents > 0.0) rightAt(m, word, p.w - p.margin, y, loud) else leftAt(m, word, p.margin, y, loud)
+        if (word == "LOOSEN") rightAt(m, word, p.w - p.margin, y, loud) else leftAt(m, word, p.margin, y, loud)
     }
 }
 

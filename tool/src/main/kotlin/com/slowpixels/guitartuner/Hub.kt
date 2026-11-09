@@ -30,7 +30,7 @@ import kotlinx.coroutines.flow.emitAll
  */
 object Hub {
     /** As in lighttool.toml. */
-    const val VERSION = "1.0.0"
+    const val VERSION = "1.1.0"
 
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     val ear = Ear { SystemClock.uptimeMillis() }

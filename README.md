@@ -5,13 +5,15 @@ A guitar tuner for the Light Phone III, built with the [Light SDK](https://githu
 <p>
   <img src="assets/tuning.png" alt="A low E being tuned: the needle a little sharp, the string wavy, the word Loosen" height="320">
   <img src="assets/in-tune.png" alt="The low E in tune: the needle upright, the lamp lit, the string straight" height="320">
+  <img src="assets/electric.png" alt="The electric: a row of lights as on a tuning pedal, the middle one lit for an A in tune" height="320">
   <img src="assets/tunings.png" alt="The list of tuning groups" height="320">
 </p>
 
 You look straight down at the guitar. The six strings run up the screen, over the soundhole on the acoustic or the
-pickups on the electric, to a meter at the top. Play a string and the needle finds it. Each string starts **slack**, in
-a lazy wave, because nothing has been heard from it yet; it tightens as it nears its note and is pulled **straight**
-when it gets there, with the lamp lit and a bell. It stays straight, so a guitar in tune is six clean lines.
+pickups on the electric, to a meter at the top: a needle on the acoustic, a row of lights as on a tuning pedal on the
+electric. Play a string and the meter finds it. Each string starts **slack**, in a lazy wave, because nothing has
+been heard from it yet; it tightens as it nears its note and is pulled **straight** when it gets there, with the lamp
+lit and a bell. It stays straight, so a guitar in tune is six clean lines.
 
 - **57 tunings** in seven groups: standard and lower, drop, open, open minor, folk and modal, slack key, and the odd and
   famous ones (Nashville, DADGAD, Bron‑Yr‑Aur, new standard…). A tuning that takes a string more than a whole step above
